@@ -1,0 +1,1598 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IDoSell Payment Matcher - Mapowanie wpłat</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Papa/5.4.1/papaparse.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #4E3261 0%, #6B4C7A 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: #F3E8E1;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4E3261 0%, #6B4C7A 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+            color: #523665;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .header-box {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .section {
+            margin-bottom: 40px;
+        }
+
+        .section h2 {
+            font-size: 20px;
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #4E3261;
+        }
+
+        .upload-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .upload-box {
+            border: 2px dashed #4E3261;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #fff9f5;
+        }
+        .logo {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo img {
+            max-height: 60px;
+            width: auto;
+        }
+        .upload-box:hover {
+            border-color: #6B4C7A;
+            background: #f5f0eb;
+            transform: translateY(-2px);
+        }
+
+        .upload-box input[type="file"] {
+            display: none;
+        }
+
+        .upload-box label {
+            cursor: pointer;
+            display: block;
+        }
+
+        .upload-icon {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .upload-box h3 {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .upload-box p {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .file-name {
+            font-size: 12px;
+            color: #4E3261;
+            font-weight: bold;
+            margin-top: 10px;
+            min-height: 20px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #4E3261 0%, #6B4C7A 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(78, 50, 97, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .alert.show {
+            display: block;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert-warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .alert ul, .alert ol {
+            margin: 10px 0 0 20px;
+        }
+
+        .alert li {
+            margin-bottom: 5px;
+        }
+
+        .results-section {
+            display: none;
+        }
+
+        .results-section.show {
+            display: block;
+        }
+
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            font-size: 13px;
+        }
+
+        .results-table thead {
+            background: #667eea;
+            color: white;
+            position: sticky;
+            top: 0;
+        }
+
+        .results-table th {
+            padding: 12px;
+            text-align: left;
+            font-weight: bold;
+            border-bottom: 2px solid #764ba2;
+        }
+
+        .results-table td {
+            padding: 12px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .results-table tbody tr:hover {
+            background: #fff9f5;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .status-ok {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .order-link {
+            color: #4E3261;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .order-link:hover {
+            text-decoration: underline;
+        }
+
+        .order-items {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #fff9f5;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .order-item {
+            padding: 4px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .order-item:last-child {
+            border-bottom: none;
+        }
+
+        .discrepancy {
+            color: #721c24;
+            font-weight: bold;
+        }
+
+        .negative-discrepancy {
+            color: #fff;
+            background: #721c24;
+            font-weight: bold;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .summary-box {
+            background: #fff9f5;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .summary-box h3 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .stat {
+            padding: 10px;
+            background: #F3E8E1;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+        }
+
+        .stat-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #4E3261;
+            margin-top: 5px;
+        }
+
+        .footer {
+            text-align: center;
+            color: #8B5CF6;
+            font-size: 13px;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #e0d5e8;
+        }
+
+        footer a {
+            color: #8B5CF6;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                padding: 15px;
+            }
+
+            .header h1 {
+                font-size: 20px;
+            }
+
+            .results-table {
+                font-size: 11px;
+            }
+
+            .results-table th, .results-table td {
+                padding: 8px;
+            }
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        .modal.show {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            background: #F3E8E1;
+            padding: 40px;
+            border-radius: 12px;
+            text-align: center;
+            max-width: 500px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal-content h2 {
+            margin: 0 0 20px 0;
+            font-size: 24px;
+        }
+
+        .modal-content .modal-icon {
+            font-size: 60px;
+            margin-bottom: 20px;
+        }
+
+        .modal-content p {
+            margin: 10px 0;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+
+        .modal-content .modal-stats {
+            background: #fff9f5;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #4E3261;
+        }
+
+        .modal-content .modal-stat-item {
+            margin: 10px 0;
+            font-size: 14px;
+        }
+
+        .modal-content button {
+            margin-top: 20px;
+            padding: 12px 40px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+            <div id="summaryModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-icon" id="modalIcon">✅</div>
+                <h2 id="modalTitle">Parsowanie zakończone!</h2>
+                <div class="modal-stats" id="modalStats"></div>
+                <p id="modalMessage"></p>
+                <button onclick="closeSummaryModal()">Dalej →</button>
+            </div>
+        </div>
+
+    <div class="container">
+        <div class="header">
+            <div class="header-box">
+                <div class="logo">
+                    <img src="https://purles.pl/data/gfx/mask/pol/logo_2_big.svg" alt="Purles Logo">
+                </div>
+                <h1>📊 IDoSell Payment Matcher</h1>
+            </div>
+            <p>Mapowanie wpłat od klientów do cotygodniowych transz wypłat</p>
+        </div>
+
+        <div class="content">
+            <!-- SEKCJA UPLOADU -->
+            <div class="section">
+                <h2>1️⃣ Załaduj pliki</h2>
+                
+                <div class="upload-container">
+                    <div class="upload-box">
+                        <label for="payoutFile">
+                            <div class="upload-icon">💰</div>
+                            <h3>Wypłaty do nas</h3>
+                            <p>Cotygodniowe transze</p>
+                            <input type="file" id="payoutFile" accept=".ods,.xlsx,.xls,.csv">
+                            <div class="file-name" id="payoutFileName"></div>
+                        </label>
+                    </div>
+
+                    <div class="upload-box">
+                        <label for="blikFile">
+                            <div class="upload-icon">📱</div>
+                            <h3>BLIK IdoPay</h3>
+                            <p>Wpłaty BLIK od klientów</p>
+                            <input type="file" id="blikFile" accept=".ods,.xlsx,.xls,.csv">
+                            <div class="file-name" id="blikFileName"></div>
+                        </label>
+                    </div>
+
+                    <div class="upload-box">
+                        <label for="paybyFile">
+                            <div class="upload-icon">💳</div>
+                            <h3>PayByLink IdoPay</h3>
+                            <p>Wpłaty szybkie przelewami</p>
+                            <input type="file" id="paybyFile" accept=".ods,.xlsx,.xls,.csv">
+                            <div class="file-name" id="paybyFileName"></div>
+                        </label>
+                    </div>
+
+                    <div class="upload-box">
+                        <label for="ordersFile">
+                            <div class="upload-icon">📋</div>
+                            <h3>Zamówienia (klienci)</h3>
+                            <p>Export zamówień z danymi klientów</p>
+                            <input type="file" id="ordersFile" accept=".csv">
+                            <div class="file-name" id="ordersFileName"></div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button onclick="processFiles()">▶️ Przetwórz pliki</button>
+                    <button onclick="clearAll()">🔄 Wyczyść</button>
+                </div>
+
+                <div id="loadingIndicator" class="loading">
+                    <div class="spinner"></div>
+                    <p>Przetwarzanie plików...</p>
+                </div>
+
+                <div id="alertContainer"></div>
+            </div>
+
+            <!-- SEKCJA WYNIKÓW -->
+            <div class="section results-section" id="resultsSection">
+                <h2>2️⃣ Wyniki mapowania</h2>
+
+                <div id="summaryBox" class="summary-box">
+                    <h3>📈 Podsumowanie</h3>
+                    <div class="summary-stats" id="summaryStats"></div>
+                </div>
+
+                <div class="button-group">
+                    <button onclick="exportToCSV()">📥 Pobierz CSV</button>
+                    <button onclick="exportToODS()">📥 Pobierz ODS</button>
+                    <button onclick="printResults()">🖨️ Drukuj</button>
+                </div>
+
+                <div style="overflow-x: auto;">
+                    <table class="results-table" id="resultsTable">
+                        <thead>
+                            <tr>
+                                <th>Status</th>
+                                <th>Data transzy (zaksięgowania)</th>
+                                <th>ID transzy</th>
+                                <th>Kwota transzy (zł)</th>
+                                <th>Wpłaty od klientów</th>
+                                <th>Data płatności</th>
+                                <th>Klient</th>
+                                <th>Kwota wpłat (zł)</th>
+                                <th>Prowizje (zł)</th>
+                                <th>Różnica (zł)</th>
+                                <th>Uwagi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsTableBody">
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="issuesContainer"></div>
+            </div>
+        </div>
+
+        <div class="footer">
+                  <br>
+                  <p style="text-align: center; color: #8B5CF6;">
+            Designed by KS for <strong><a href="https://www.purles.pl" style="color: #8B5CF6; text-decoration: none;">Purlés</a></strong>
+        </p>
+                  <br>
+        </div>
+    </div>
+
+    <script>
+        // ===== ZMIENNE GLOBALNE =====
+        let parsedData = {
+            payouts: [],
+            blik: [],
+            payby: []
+        };
+        let ordersData = {};
+        let lastResults = null;
+
+        
+        // ===== DETEKCJA MIESIĘCY =====
+        function detectMonths() {
+            const months = new Set();
+            
+            // Zbieraj miesiące z transz
+            parsedData.payouts.forEach(p => {
+                if (p.dateAdded) {
+                    const monthKey = p.dateAdded.getFullYear() + '-' + String(p.dateAdded.getMonth() + 1).padStart(2, '0');
+                    months.add(monthKey);
+                }
+            });
+            
+            // Zbieraj miesiące z wpłat
+            [...parsedData.blik, ...parsedData.payby].forEach(p => {
+                if (p.dateBooked) {
+                    const monthKey = p.dateBooked.getFullYear() + '-' + String(p.dateBooked.getMonth() + 1).padStart(2, '0');
+                    months.add(monthKey);
+                }
+            });
+            
+            const sortedMonths = Array.from(months).sort().reverse();
+            console.log('Miesiące w plikach:', sortedMonths);
+            return sortedMonths;
+        }
+
+        // ===== SELEKTOR MIESIĘCY =====
+        function showMonthSelector(months) {
+            const alertContainer = document.getElementById('alertContainer');
+            alertContainer.innerHTML = '';
+            
+            const monthNames = {
+                '01': 'Styczeń', '02': 'Luty', '03': 'Marzec', '04': 'Kwiecień',
+                '05': 'Maj', '06': 'Czerwiec', '07': 'Lipiec', '08': 'Sierpień',
+                '09': 'Wrzesień', '10': 'Październik', '11': 'Listopad', '12': 'Grudzień'
+            };
+            
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-info show';
+            
+            let html = `<strong>📅 Wybierz miesiąc do rozliczenia:</strong><br><div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">`;
+            
+            months.forEach(month => {
+                const [year, monthNum] = month.split('-');
+                const monthName = monthNames[monthNum] || 'Nieznany';
+                const displayText = `${monthName} ${year}`;
+                
+                html += `<button onclick="filterByMonth('${month}')" style="padding: 10px 20px;">${displayText}</button>`;
+            });
+            
+            html += `</div>`;
+            alert.innerHTML = html;
+            alertContainer.appendChild(alert);
+            
+            console.log('Selektor miesięcy wyświetlony dla:', months);
+        }
+
+        function filterByMonth(selectedMonth) {
+            console.log('Filtrowanie dla miesiąca:', selectedMonth);
+            
+            const [year, month] = selectedMonth.split('-');
+            const selectedMonthDate = new Date(year, parseInt(month) - 1, 1);
+            const endDate = new Date(year, parseInt(month), 0, 23, 59, 59);
+            
+            // Znajdź transze w wybranym miesiącu
+            const payoutsInMonth = parsedData.payouts.filter(p => {
+                return p.dateAdded >= selectedMonthDate && p.dateAdded <= endDate;
+            });
+            
+            console.log(`Transze w miesiącu: ${payoutsInMonth.length}`);
+            
+            // Punkt startowy: ostatnia transza sprzed wybranego miesiąca
+            let periodStartPayment = new Date(2000, 0, 1); // Default - od początku
+            
+            const payoutsBeforeMonth = parsedData.payouts.filter(p => {
+                return p.dateAdded < selectedMonthDate;
+            });
+            
+            if (payoutsBeforeMonth.length > 0) {
+                // Sortuj po dacie dodania, aby znaleźć ostatnią transszę
+                const sortedBefore = payoutsBeforeMonth.sort((a, b) => b.dateAdded - a.dateAdded);
+                periodStartPayment = sortedBefore[0].dateAdded; // Ostatnia transza sprzed miesiąca
+                console.log(`Punkt startowy (ostatnia transza poprzedniego miesiąca): ${formatDate(periodStartPayment)}`);
+            }
+            
+            // Filtruj transze - bierz z wybranego miesiąca
+            const filteredPayouts = payoutsInMonth;
+            
+            // Filtruj wpłaty - od ostatniej transzy poprzedniego miesiąca (exclusive) do konca wybranego miesiąca (inclusive)
+            const filteredBlik = parsedData.blik.filter(p => {
+                return p.dateBooked > periodStartPayment && p.dateBooked <= endDate;
+            });
+            
+            const filteredPayby = parsedData.payby.filter(p => {
+                return p.dateBooked > periodStartPayment && p.dateBooked <= endDate;
+            });
+            
+            console.log(`Filtrowane wpłaty: ${filteredBlik.length} BLIK + ${filteredPayby.length} PayByLink`);
+            
+            // Tymczasowo zastąp dane
+            const originalPayouts = parsedData.payouts;
+            const originalBlik = parsedData.blik;
+            const originalPayby = parsedData.payby;
+            
+            parsedData.payouts = filteredPayouts;
+            parsedData.blik = filteredBlik;
+            parsedData.payby = filteredPayby;
+            
+            // Mapowanie i wyświetlanie
+            const results = mapPayments();
+            displayResults(results);
+            
+            // Przywróć oryginalne dane
+            parsedData.payouts = originalPayouts;
+            parsedData.blik = originalBlik;
+            parsedData.payby = originalPayby;
+            
+            document.getElementById('resultsSection').classList.add('show');
+            
+            // Scroll do wyników
+            setTimeout(() => {
+                document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth' });
+            }, 100);
+        }
+
+        // ===== OBSŁUGA UPLOADU =====
+        document.getElementById('payoutFile').addEventListener('change', function(e) {
+            updateFileName('payoutFileName', this.files[0]);
+        });
+
+        document.getElementById('blikFile').addEventListener('change', function(e) {
+            updateFileName('blikFileName', this.files[0]);
+        });
+
+        document.getElementById('paybyFile').addEventListener('change', function(e) {
+            updateFileName('paybyFileName', this.files[0]);
+        });
+
+        document.getElementById('ordersFile').addEventListener('change', function(e) {
+            updateFileName('ordersFileName', this.files[0]);
+        });
+
+        function updateFileName(elementId, file) {
+            if (file) {
+                document.getElementById(elementId).textContent = '✅ ' + file.name;
+            }
+        }
+
+
+        // ===== PARSOWANIE ZAMÓWIEŃ =====
+        function parseOrders(csvData) {
+            const orders = {};
+            
+            // csvData może być array lub string
+            let lines;
+            if (Array.isArray(csvData)) {
+                // Jeśli to array - to już sparsowany CSV
+                lines = csvData;
+            } else if (typeof csvData === 'string') {
+                // Jeśli to string - parsuj go
+                lines = csvData.split('\n');
+            } else {
+                console.error('Błędny format danych zamówień');
+                return orders;
+            }
+            
+            if (lines.length < 2) {
+                console.log('Brak danych w pliku zamówień');
+                return orders;
+            }
+            
+            // Czytanie nagłówków
+            const headerLine = Array.isArray(lines[0]) ? lines[0] : parseCSVLine(lines[0]);
+            const headers = headerLine.map(h => String(h).trim().replace(/^"|"$/g, ''));
+            console.log('Nagłówki zamówień:', headers);
+            
+            // Indeksy kolumn
+            const orderNumIdx = headers.indexOf('Nr zamówienia');
+            const firstNameIdx = headers.indexOf('Biling-Imię');
+            const lastNameIdx = headers.indexOf('Biling-Nazwisko');
+            const companyIdx = headers.indexOf('Biling-Nazwa firmy');
+            
+            if (orderNumIdx === -1) {
+                console.error('Nie znaleziono kolumny "Nr zamówienia"');
+                console.log('Dostępne kolumny:', headers);
+                return orders;
+            }
+            
+            console.log(`Kolumny: OrderNum=${orderNumIdx}, FirstName=${firstNameIdx}, LastName=${lastNameIdx}, Company=${companyIdx}`);
+            
+            // Parsowanie wierszy
+            for (let i = 1; i < lines.length; i++) {
+                let cells;
+                
+                if (Array.isArray(lines[i])) {
+                    cells = lines[i].map(c => String(c || '').trim());
+                } else {
+                    if (!lines[i].trim()) continue;
+                    cells = parseCSVLine(lines[i]);
+                }
+                
+                if (cells.length > orderNumIdx) {
+                    const orderNum = cells[orderNumIdx].trim();
+                    if (orderNum && !isNaN(orderNum)) {
+                        const firstName = firstNameIdx >= 0 ? cells[firstNameIdx].trim() : '';
+                        const lastName = lastNameIdx >= 0 ? cells[lastNameIdx].trim() : '';
+                        const company = companyIdx >= 0 ? cells[companyIdx].trim() : '';
+                        
+                        // Nazwisko klienta
+                        let clientName = firstName + ' ' + lastName;
+                        if (company && company !== '') {
+                            clientName = company;
+                        }
+                        
+                        orders[parseInt(orderNum)] = {
+                            firstName: firstName,
+                            lastName: lastName,
+                            company: company,
+                            fullName: clientName.trim()
+                        };
+                    }
+                }
+            }
+            
+            console.log(`✓ Załadowano ${Object.keys(orders).length} zamówień`);
+            return orders;
+        }
+        
+        function parseCSVLine(line) {
+            const result = [];
+            let current = '';
+            let inQuotes = false;
+            
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                
+                if (char === '"') {
+                    if (inQuotes && line[i + 1] === '"') {
+                        current += '"';
+                        i++;
+                    } else {
+                        inQuotes = !inQuotes;
+                    }
+                } else if (char === ';' && !inQuotes) {
+                    result.push(current);
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            
+            result.push(current);
+            return result;
+        }
+
+
+                // ===== CZYTANIE PLIKÓW =====
+        function readFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        let data;
+                        const fileName = file.name.toLowerCase();
+                        
+                        if (fileName.endsWith('.ods')) {
+                            // Obsługa ODS - czytaj jako binarny i parsuj z XLSX
+                            const workbook = XLSX.read(e.target.result, { type: 'array' });
+                            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                            data = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' });
+                            console.log(`Plik ${fileName}: ${data.length} wierszy`);
+                            resolve(data);
+                        } else if (fileName.endsWith('.csv')) {
+                            // Obsługa CSV - własny parser
+                            const text = e.target.result;
+                            const lines = text.split('\n');
+                            data = [];
+                            
+                            lines.forEach(line => {
+                                if (line.trim()) {
+                                    // Parsowanie CSV z cudzysłowami i średnikami
+                                    const cells = parseCSVLine(line);
+                                    data.push(cells);
+                                }
+                            });
+                            
+                            console.log(`Plik ${fileName}: ${data.length} wierszy`);
+                            resolve(data);
+                        } else {
+                            // Obsługa XLSX/XLS
+                            const workbook = XLSX.read(e.target.result, { type: 'array' });
+                            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                            data = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' });
+                            console.log(`Plik ${fileName}: ${data.length} wierszy`);
+                            resolve(data);
+                        }
+                    } catch (error) {
+                        console.error('Błąd readFile:', error);
+                        reject(error);
+                    }
+                };
+                
+                reader.onerror = function(error) {
+                    reject(error);
+                };
+                
+                // Obsługa binarnych dla XLSX/ODS, text dla CSV
+                if (file.name.toLowerCase().endsWith('.csv')) {
+                    reader.readAsText(file, 'UTF-8');
+                } else {
+                    reader.readAsArrayBuffer(file);
+                }
+            });
+        }
+
+        // ===== PARSOWANIE DANYCH =====
+        async function processFiles() {
+            const alertContainer = document.getElementById('alertContainer');
+            alertContainer.innerHTML = '';
+
+            const payoutFile = document.getElementById('payoutFile').files[0];
+            const blikFile = document.getElementById('blikFile').files[0];
+            const paybyFile = document.getElementById('paybyFile').files[0];
+            const ordersFile = document.getElementById('ordersFile').files[0];
+
+            if (!payoutFile || !blikFile || !paybyFile) {
+                showAlert('Błąd', 'Musisz załadować pliki: Transze, BLIK i PayByLink!', 'error');
+                return;
+            }
+
+            if (!ordersFile) {
+                showAlert('Ostrzeżenie', 'Plik zamówień nie został załadowany. Dane klientów nie będą dostępne.', 'warning');
+            }
+
+            document.getElementById('loadingIndicator').style.display = 'block';
+
+            try {
+                const payoutData = await readFile(payoutFile);
+                const blikData = await readFile(blikFile);
+                const paybyData = await readFile(paybyFile);
+
+                // Parsowanie danych
+                parsedData.payouts = parsePayouts(payoutData);
+                parsedData.blik = parsePayments(blikData, 'BLIK');
+                parsedData.payby = parsePayments(paybyData, 'PayByLink');
+                
+                // Parsowanie zamówień jeśli został załadowany
+                if (ordersFile) {
+                    const ordersCSVData = await readFile(ordersFile);
+                    ordersData = parseOrders(ordersCSVData);
+                }
+
+                // Walidacja
+                const validationResults = validateData();
+                
+                if (validationResults.errors.length > 0) {
+                    validationResults.errors.forEach(error => {
+                        showAlert('Błąd krityczny', error, 'error');
+                    });
+                    document.getElementById('loadingIndicator').style.display = 'none';
+                    return;
+                }
+
+                if (validationResults.warnings.length > 0) {
+                    validationResults.warnings.forEach(warning => {
+                        showAlert('Ostrzeżenie', warning, 'warning');
+                    });
+                }
+
+                // Detekcja miesięcy w plikach
+                const months = detectMonths();
+                
+                if (months.length > 1) {
+                    // Jeśli więcej niż jeden miesiąc - pokaż selektor
+                    document.getElementById('loadingIndicator').style.display = 'none';
+                    showMonthSelector(months);
+                } else {
+                    // Jeśli jeden miesiąc - przetwarzaj normalnie
+                    const results = mapPayments();
+                    displayResults(results);
+                    document.getElementById('loadingIndicator').style.display = 'none';
+                    document.getElementById('resultsSection').classList.add('show');
+                }
+
+            } catch (error) {
+                console.error(error);
+                showAlert('Błąd', 'Nie udało się przeczytać pliku: ' + error.message, 'error');
+                document.getElementById('loadingIndicator').style.display = 'none';
+            }
+        }
+
+        function parsePayouts(rawData) {
+            console.log('=== PARSEOWANIE PAYOUTS ===');
+            console.log(`Surowe dane: ${rawData.length} wierszy`);
+            
+            // Nagłówek jest w wierszu 3 (indeks 3)
+            let headerRowIndex = 3;
+            
+            // Szukam wiersza nagłówka - zabezpieczenie
+            for (let i = 0; i < Math.min(rawData.length, 15); i++) {
+                const firstCell = String(rawData[i]?.[0] || '').trim();
+                if (firstCell.includes('Numer zamówienia')) {
+                    headerRowIndex = i;
+                    console.log(`Header znaleziony w wierszu ${i}`);
+                    break;
+                }
+            }
+
+            const dataRows = rawData.slice(headerRowIndex + 1);
+            console.log(`Dane do przetworzenia: ${dataRows.length} wierszy`);
+
+            const filtered = dataRows
+                .filter(row => {
+                    if (!row || row.length === 0) return false;
+                    
+                    // Szukamy danych o transakcjach - kolumna 11 (ID płatności) musi mieć wartość
+                    const paymentId = String(row[11] || '').trim();
+                    const kwota = row[2];
+                    
+                    const hasData = paymentId && paymentId !== '' && paymentId !== 'NaN' && kwota !== null && kwota !== undefined;
+                    
+                    if (hasData) {
+                        console.log(`✓ Wiersz ma dane: ID=${paymentId}, Kwota=${kwota}`);
+                    }
+                    
+                    return hasData;
+                })
+                .map((row, idx) => {
+                    const dateAddedStr = String(row[7] || '').trim();
+                    const dateBookedStr = String(row[8] || '').trim();
+                    const amount = Math.abs(parseFloat(String(row[2] || '0').replace(',', '.')));
+                    
+                    const parsed = {
+                        dateAdded: parseDate(dateAddedStr),
+                        dateBooked: parseDate(dateBookedStr),
+                        amount: amount,
+                        transactionId: String(row[1] || ''),
+                        paymentId: String(row[11] || ''),
+                        rowData: row
+                    };
+
+                    console.log(`Parsowana transza ${idx}: ${parsed.paymentId} | ${dateBookedStr} | ${amount}`);
+                    return parsed;
+                })
+                .filter(p => {
+                    const valid = p.dateBooked && !isNaN(p.dateBooked.getTime());
+                    if (!valid) {
+                        console.log(`❌ Filtrowana (invalid date): ${p.paymentId}`);
+                    }
+                    return valid;
+                });
+
+            console.log(`✅ Załadowano ${filtered.length} transz`);
+            return filtered;
+        }
+
+        function parsePayments(rawData, type) {
+            console.log(`=== PARSEOWANIE PAYMENTS (${type}) ===`);
+            console.log(`Surowe dane: ${rawData.length} wierszy`);
+            
+            // Szukam wiersza nagłówka
+            let headerRowIndex = 2;
+            for (let i = 0; i < Math.min(rawData.length, 15); i++) {
+                const firstCell = String(rawData[i]?.[0] || '').trim();
+                if (firstCell.includes('Numer zamówienia')) {
+                    headerRowIndex = i;
+                    console.log(`Header znaleziony w wierszu ${i}`);
+                    break;
+                }
+            }
+
+            const dataRows = rawData.slice(headerRowIndex + 1);
+            console.log(`Dane do przetworzenia: ${dataRows.length} wierszy`);
+
+            const filtered = dataRows
+                .filter(row => {
+                    if (!row || row.length === 0) return false;
+                    const firstCol = String(row[0] || '').trim();
+                    // Musi być numerem zamówienia (liczba)
+                    return /^\d+$/.test(firstCol);
+                })
+                .map((row, idx) => {
+                    const orderNumber = String(row[0] || '').trim();
+                    const dateStr = String(row[8] || '').trim();
+                    const amount = parseFloat(String(row[2] || '0').replace(',', '.'));
+                    const commission = parseFloat(String(row[13] || '0').replace(',', '.'));
+                    const transactionId = String(row[1] || '');
+                    
+                    if (idx < 3 || idx % 30 === 0) {
+                        console.log(`Wpłata ${idx}: #${orderNumber} | ${dateStr} | ${amount} zł`);
+                    }
+                    
+                    return {
+                        orderNumber,
+                        transactionId,
+                        dateBooked: parseDate(dateStr),
+                        amount,
+                        commission,
+                        type,
+                        rowData: row
+                    };
+                })
+                .filter(p => {
+                    const valid = p.dateBooked && !isNaN(p.dateBooked.getTime()) && p.orderNumber;
+                    if (!valid) {
+                        console.log(`❌ Filtrowana (${type}): ${p.orderNumber} - ${p.dateBooked}`);
+                    }
+                    return valid;
+                });
+
+            console.log(`✅ Załadowano ${filtered.length} wpłat (${type})`);
+            return filtered;
+        }
+
+        function parseDate(dateStr) {
+            if (!dateStr) return null;
+            
+            // Próba parsowania jako data ISO
+            const date = new Date(dateStr);
+            if (!isNaN(date.getTime())) {
+                return date;
+            }
+            
+            // Próba parsowania polskiego formatu
+            const match = dateStr.match(/(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/);
+            if (match) {
+                return new Date(match[1], parseInt(match[2]) - 1, match[3], match[4], match[5]);
+            }
+            
+            return null;
+        }
+
+        // ===== WALIDACJA =====
+        function validateData() {
+            const errors = [];
+            const warnings = [];
+
+            if (parsedData.payouts.length === 0) {
+                errors.push('Brak danych w pliku "Wypłaty do nas"');
+            }
+            if (parsedData.blik.length === 0 && parsedData.payby.length === 0) {
+                errors.push('Brak danych w plikach z wpłatami od klientów');
+            }
+
+            // Sprawdzenie duplikatów w wpłatach
+            const allPayments = [...parsedData.blik, ...parsedData.payby];
+            const duplicateOrders = {};
+            allPayments.forEach(p => {
+                duplicateOrders[p.orderNumber] = (duplicateOrders[p.orderNumber] || 0) + 1;
+            });
+
+            Object.entries(duplicateOrders).forEach(([order, count]) => {
+                if (count > 1) {
+                    warnings.push(`Zamówienie ${order} pojawia się ${count} razy w plikach wpłat`);
+                }
+            });
+
+            // Sprawdzenie wartości ujemnych (zwroty?)
+            const negativePayments = allPayments.filter(p => p.amount < 0);
+            if (negativePayments.length > 0) {
+                warnings.push(`⚠️ Znaleziono ${negativePayments.length} wpłat z ujemnymi kwotami (możliwe zwroty)`);
+            }
+
+            return { errors, warnings };
+        }
+
+        // ===== MAPOWANIE WPŁAT =====
+        function mapPayments() {
+            const allPayments = [...parsedData.blik, ...parsedData.payby];
+            
+            console.log('\n=== MAPOWANIE WPŁAT ===');
+            console.log(`Transze do mapowania: ${parsedData.payouts.length}`);
+            console.log(`Wpłaty BLIK: ${parsedData.blik.length}`);
+            console.log(`Wpłaty PayByLink: ${parsedData.payby.length}`);
+            console.log(`Razem wpłat: ${allPayments.length}`);
+
+            // Sortuję transze od najstarszej do najnowszej (bo mogą być w odwrotnym porządku)
+            // WAŻNE: Sortuję po Data DODANIA, nie zaksięgowania!
+            const sortedPayouts = [...parsedData.payouts].sort((a, b) => a.dateAdded - b.dateAdded);
+            
+            console.log('\nTransze (posortowane po Data Dodania):');
+            sortedPayouts.forEach((p, i) => {
+                console.log(`  ${i}: Dodana: ${formatDate(p.dateAdded)} | Zaksięgowana: ${formatDate(p.dateBooked)} | ID: ${p.paymentId}`);
+            });
+
+            const results = [];
+
+            sortedPayouts.forEach((payout, index) => {
+                console.log(`\n--- Mapowanie transzy ${index} (Dodana: ${formatDate(payout.dateAdded)}) ---`);
+                
+                // Okres: od daty dodania poprzedniej transzy (exclusive) do daty dodania bieżącej transzy (inclusive)
+                let periodStart;
+                let periodEnd = payout.dateAdded; // UŻYWAMY Data Dodania, nie zaksięgowania!
+
+                if (index === 0) {
+                    // Dla pierwszej transzy - od początku czasów
+                    periodStart = new Date(2000, 0, 1);
+                    console.log(`Pierwszy okres: od ${formatDate(periodStart)} do ${formatDate(periodEnd)}`);
+                } else {
+                    periodStart = sortedPayouts[index - 1].dateAdded; // POPRZEDNIA TRANSZA też po Data Dodania!
+                    console.log(`Okres: od ${formatDate(periodStart)} (excl) do ${formatDate(periodEnd)} (incl)`);
+                }
+
+                // Znalezienie wpłat w danym oknie czasowym
+                // WAŻNE: Wpłaty mapujemy po Data Zaksięgowania (kiedy faktycznie trafiły)
+                const matchingPayments = allPayments.filter(p => {
+                    const isMatch = p.dateBooked > periodStart && p.dateBooked <= periodEnd;
+                    return isMatch;
+                });
+
+                console.log(`✓ Znaleziono ${matchingPayments.length} wpłat`);
+                matchingPayments.slice(0, 5).forEach(p => {
+                    console.log(`  - Zamówienie ${p.orderNumber} (${p.type}): Zaksięgowana: ${formatDate(p.dateBooked)} | ${p.amount} zł`);
+                });
+                if (matchingPayments.length > 5) {
+                    console.log(`  ... i ${matchingPayments.length - 5} więcej`);
+                }
+
+                // Obliczenia
+                // WAŻNE: Wpłaty to kwoty brutto, ale transza to NETTO (po prowizjach)
+                // Dlatego: Kwota netto = suma wpłat - suma prowizji
+                const totalAmount = matchingPayments.reduce((sum, p) => sum + p.amount, 0);
+                const totalCommission = matchingPayments.reduce((sum, p) => sum + p.commission, 0);
+                const totalNetAmount = totalAmount - totalCommission; // NETTO dla porównania z transszą
+                
+                const difference = payout.amount - totalNetAmount;
+
+                // Status
+                let status = 'ok';
+                let issues = [];
+
+                if (Math.abs(difference) > 0.01) { // tolerancja zaokrąglenia
+                    status = 'warning';
+                    if (difference < 0) {
+                        issues.push(`⚠️ UJEMNA RÓŻNICA: IDoSell pobrał dodatkowe ${Math.abs(difference).toFixed(2)} zł`);
+                    } else {
+                        issues.push(`Różnica: +${difference.toFixed(2)} zł`);
+                    }
+                }
+
+                if (matchingPayments.length === 0) {
+                    status = 'warning';
+                    issues.push('Brak powiązanych wpłat od klientów');
+                }
+
+                const negativePayments = matchingPayments.filter(p => p.amount < 0);
+                if (negativePayments.length > 0) {
+                    issues.push(`${negativePayments.length} ujemne kwoty (zwroty?)`);
+                }
+
+                console.log(`Status: ${status} | Różnica: ${difference.toFixed(2)} zł`);
+
+                results.push({
+                    payout,
+                    matchingPayments,
+                    status,
+                    issues,
+                    totalAmount,           // Brutto
+                    totalCommission,       // Prowizje
+                    totalNetAmount,        // Netto
+                    difference
+                });
+            });
+
+            console.log('\n=== KONIEC MAPOWANIA ===\n');
+            return results;
+        }
+
+        // ===== WYŚWIETLANIE WYNIKÓW =====
+        function displayResults(results) {
+            lastResults = results;
+            const tbody = document.getElementById('resultsTableBody');
+            const summaryBox = document.getElementById('summaryStats');
+            tbody.innerHTML = '';
+
+            let totalPayouts = 0;
+            let totalPaymentsBrutto = 0;
+            let totalPaymentsNetto = 0;
+            let totalDifferences = 0;
+            let issuesCount = 0;
+
+            results.forEach((result, idx) => {
+                totalPayouts += result.payout.amount;
+                totalPaymentsBrutto += result.totalAmount;
+                totalPaymentsNetto += result.totalNetAmount;
+                totalDifferences += result.difference;
+
+                if (result.issues.length > 0) {
+                    issuesCount++;
+                }
+
+                // Jeśli są zamówienia - każde w osobnym wierszu
+                if (result.matchingPayments.length > 0) {
+                    result.matchingPayments.forEach((payment, payIdx) => {
+                        const row = document.createElement('tr');
+                        
+                        // Status i info o transzy tylko w pierwszym wierszu
+                        const statusClass = `status-${result.status}`;
+                        const isFirstPayment = payIdx === 0;
+                        
+                        // Zaznacz cały wiersz jeśli ujemna różnica
+                        const isNegativeDiff = result.difference < -0.01;
+                        if (isNegativeDiff && isFirstPayment) {
+                            row.style.background = '#fff3cd';
+                            row.style.fontWeight = 'bold';
+                        }
+                        
+                        // Dane klienta
+                        const clientInfo = ordersData[payment.orderNumber];
+                        const clientName = clientInfo ? clientInfo.fullName : '-';
+                        
+                        row.innerHTML = `
+                            <td>${isFirstPayment ? `<span class="status-badge ${statusClass}">${result.status === 'ok' ? '✅ OK' : result.status === 'warning' ? '⚠️ UWAGA' : '❌ BŁĄD'}</span>` : ''}</td>
+                            <td>${isFirstPayment ? formatDate(result.payout.dateBooked) : ''}</td>
+                            <td>${isFirstPayment ? result.payout.paymentId : ''}</td>
+                            <td class="text-right">${isFirstPayment ? result.payout.amount.toFixed(2) : ''}</td>
+                            <td>
+                                <a href="https://purles.pl/panel/orderd.php?idt=${payment.orderNumber}" target="_blank" class="order-link">#${payment.orderNumber}</a> (${payment.type})
+                            </td>
+                            <td>${formatDate(payment.dateBooked)}</td>
+                            <td>${clientName}</td>
+                            <td class="text-right">${payment.amount.toFixed(2)}</td>
+                            <td class="text-right">-${payment.commission.toFixed(2)}</td>
+                            <td class="text-right ${isFirstPayment && Math.abs(result.difference) > 0.01 ? (result.difference < 0 ? 'negative-discrepancy' : 'discrepancy') : ''}">${isFirstPayment ? result.difference.toFixed(2) : ''}</td>
+                            <td>${isFirstPayment ? (result.issues.length > 0 ? result.issues.join('<br>') : '-') : ''}</td>
+                        `;
+                        
+                        tbody.appendChild(row);
+                    });
+                } else {
+                    // Jeśli brak zamówień - wyświetl wiersz z pustym polem zamówień
+                    const row = document.createElement('tr');
+                    const statusClass = `status-${result.status}`;
+                    
+                    // Zaznacz cały wiersz jeśli ujemna różnica
+                    const isNegativeDiff = result.difference < -0.01;
+                    if (isNegativeDiff) {
+                        row.style.background = '#fff3cd';
+                        row.style.fontWeight = 'bold';
+                    }
+                    
+                    row.innerHTML = `
+                        <td><span class="status-badge ${statusClass}">${result.status === 'ok' ? '✅ OK' : result.status === 'warning' ? '⚠️ UWAGA' : '❌ BŁĄD'}</span></td>
+                        <td>${formatDate(result.payout.dateBooked)}</td>
+                        <td>${result.payout.paymentId}</td>
+                        <td class="text-right">${result.payout.amount.toFixed(2)}</td>
+                        <td style="color: #999; font-style: italic;">Brak powiązanych zamówień</td>
+                        <td class="text-right">0.00</td>
+                        <td class="text-right">0.00</td>
+                        <td class="text-right ${Math.abs(result.difference) > 0.01 ? (result.difference < 0 ? 'negative-discrepancy' : 'discrepancy') : ''}">${result.difference.toFixed(2)}</td>
+                        <td>${result.issues.length > 0 ? result.issues.join('<br>') : '-'}</td>
+                    `;
+                    
+                    tbody.appendChild(row);
+                }
+            });
+
+            // Pokaż modal z podsumowaniem
+            const hasDiscrepancies = issuesCount > 0;
+            showSummaryModal(hasDiscrepancies, totalDifferences);
+
+            // Podsumowanie
+            summaryBox.innerHTML = `
+                <div class="stat">
+                    <div class="stat-label">Transze</div>
+                    <div class="stat-value">${results.length}</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Kwota transz NETTO (zł)</div>
+                    <div class="stat-value">${totalPayouts.toFixed(2)}</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Wpłaty BRUTTO (zł)</div>
+                    <div class="stat-value">${totalPaymentsBrutto.toFixed(2)}</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Wpłaty NETTO (zł)</div>
+                    <div class="stat-value">${totalPaymentsNetto.toFixed(2)}</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Razem prowizje (zł)</div>
+                    <div class="stat-value">${(totalPaymentsBrutto - totalPaymentsNetto).toFixed(2)}</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Razem różnice (zł)</div>
+                    <div class="stat-value">${totalDifferences.toFixed(2)}</div>
+                </div>
+            `;
+        }
+
+        // ===== ALERT =====
+        function showAlert(title, message, type) {
+            const alertContainer = document.getElementById('alertContainer');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type} show`;
+            alert.innerHTML = `<strong>${title}:</strong> ${message}`;
+            alertContainer.appendChild(alert);
+
+            setTimeout(() => {
+                alert.classList.remove('show');
+                setTimeout(() => alert.remove(), 300);
+            }, 5000);
+        }
+
+        // ===== EXPORT =====
+        function exportToCSV() {
+            const table = document.getElementById('resultsTable');
+            const csv = [];
+            
+            // Nagłówki
+            const headers = [];
+            table.querySelectorAll('thead th').forEach(th => {
+                headers.push('"' + th.textContent.trim().replace(/"/g, '""') + '"');
+            });
+            csv.push(headers.join(';'));
+
+            // Dane
+            table.querySelectorAll('tbody tr').forEach(tr => {
+                const cells = [];
+                tr.querySelectorAll('td').forEach((td, idx) => {
+                    let text = td.textContent.trim();
+                    // Najpierw zamień WSZYSTKIE kropki na przecinki
+                    text = text.replace(/\./g, ',');
+                    // Potem cofnij przecinki na kropki tylko w datach (format: d,dd,yyyy)
+                    text = text.replace(/(\d{1,2}),(\d{2}),(\d{4})/g, '$1.$2.$3');
+                    text = text.replace(/\n/g, ' ').replace(/\s+/g, ' ');
+                    cells.push('"' + text.replace(/"/g, '""') + '"');
+                });
+                csv.push(cells.join(';'));
+            });
+
+            downloadFile(csv.join('\n'), 'idosell-mapowanie-' + new Date().toISOString().split('T')[0] + '.csv', 'text/csv;charset=utf-8');
+        }
+
+        function exportToODS() {
+            const table = document.getElementById('resultsTable');
+            const data = [];
+            
+            // Nagłówki
+            const headers = [];
+            table.querySelectorAll('thead th').forEach(th => {
+                headers.push(th.textContent.trim());
+            });
+            data.push(headers);
+
+            // Dane
+            table.querySelectorAll('tbody tr').forEach(tr => {
+                const cells = [];
+                tr.querySelectorAll('td').forEach((td, idx) => {
+                    let text = td.textContent.trim();
+                    
+                    // Jeśli to kolumna z kwotą lub ID transzy
+                    const columnHeaders = ['Kwota transzy', 'Kwota wpłat', 'Prowizje', 'Różnica', '(zł)', 'Różnica', 'ID transzy'];
+                    const isAmountColumn = columnHeaders.some(h => {
+                        const th = Array.from(table.querySelectorAll('thead th'))[Array.from(tr.querySelectorAll('td')).indexOf(td)];
+                        return th && th.textContent.includes(h);
+                    });
+                    
+                    if (isAmountColumn && text !== '' && text !== '-' && !text.includes('Brak')) {
+                        // Zamień przecinek na kropkę i skonwertuj na liczbę
+                        const numValue = parseFloat(text.replace(',', '.'));
+                        if (!isNaN(numValue)) {
+                            cells.push(numValue);
+                        } else {
+                            cells.push(text);
+                        }
+                    } else {
+                        // Dla dat i tekstów: zamień WSZYSTKIE kropki na przecinki
+                        text = text.replace(/\./g, ',');
+                        // Cofnij przecinki na kropki tylko w datach (format: d,dd,yyyy)
+                        text = text.replace(/(\d{1,2}),(\d{2}),(\d{4})/g, '$1.$2.$3');
+                        text = text.replace(/\n/g, ' ').replace(/\s+/g, ' ');
+                        cells.push(text);
+                    }
+                });
+                data.push(cells);
+            });
+
+            const ws = XLSX.utils.aoa_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Mapowanie');
+            XLSX.writeFile(wb, 'idosell-mapowanie-' + new Date().toISOString().split('T')[0] + '.ods');
+        }
+
+        function downloadFile(content, filename, mimeType) {
+            const blob = new Blob([content], { type: mimeType });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+
+        function printResults() {
+            window.print();
+        }
+
+        // ===== UTILITY =====
+        function formatDate(date) {
+            if (!date) return '-';
+            const d = new Date(date);
+            const day = String(d.getDate()).padStart(2, '0');
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const year = d.getFullYear();
+            const hours = String(d.getHours()).padStart(2, '0');
+            const minutes = String(d.getMinutes()).padStart(2, '0');
+            return `${day}.${month}.${year} ${hours}:${minutes}`;
+        }
+
+        function clearAll() {
+            document.getElementById('payoutFile').value = '';
+            document.getElementById('blikFile').value = '';
+            document.getElementById('paybyFile').value = '';
+            document.getElementById('payoutFileName').textContent = '';
+            document.getElementById('blikFileName').textContent = '';
+            document.getElementById('paybyFileName').textContent = '';
+            document.getElementById('alertContainer').innerHTML = '';
+            document.getElementById('resultsSection').classList.remove('show');
+            parsedData = { payouts: [], blik: [], payby: [] };
+        }
+
+
+        // ===== OBSŁUGA MODALA =====
+        function showSummaryModal(hasDiscrepancies, totalDifference) {
+            const modal = document.getElementById('summaryModal');
+            const icon = document.getElementById('modalIcon');
+            const title = document.getElementById('modalTitle');
+            const stats = document.getElementById('modalStats');
+            const message = document.getElementById('modalMessage');
+            
+            if (hasDiscrepancies) {
+                icon.innerHTML = '⚠️';
+                title.innerHTML = 'Znaleziono rozbieżności!';
+                message.innerHTML = `Łączna różnica: <strong>${totalDifference.toFixed(2)} zł</strong><br><br>Sprawdź szczegóły poniżej.`;
+                icon.style.color = '#ff9800';
+            } else {
+                icon.innerHTML = '✅';
+                title.innerHTML = 'Wszystko OK!';
+                message.innerHTML = 'Wszystkie transze się zgadzają. Brak rozbieżności.';
+                icon.style.color = '#4CAF50';
+            }
+            
+            let statsHtml = '<div class="modal-stat-item"><strong>Transze:</strong> ' + lastResults.length + '</div>';
+            let totalPayouts = lastResults.reduce((s, r) => s + r.payout.amount, 0);
+            let totalNetto = lastResults.reduce((s, r) => s + r.totalNetAmount, 0);
+            statsHtml += '<div class="modal-stat-item"><strong>Kwota NETTO:</strong> ' + totalPayouts.toFixed(2).replace('.', ',') + ' zł</div>';
+            statsHtml += '<div class="modal-stat-item"><strong>Wpłaty NETTO:</strong> ' + totalNetto.toFixed(2).replace('.', ',') + ' zł</div>';
+            statsHtml += '<div class="modal-stat-item"><strong>Razem rozbieżności:</strong> ' + totalDifference.toFixed(2).replace('.', ',') + ' zł</div>';
+            
+            stats.innerHTML = statsHtml;
+            modal.classList.add('show');
+            
+            setTimeout(() => closeSummaryModal(), 4000);
+        }
+
+        function closeSummaryModal() {
+            const modal = document.getElementById('summaryModal');
+            modal.classList.remove('show');
+        }
+    </script>
+</body>
+</html>
