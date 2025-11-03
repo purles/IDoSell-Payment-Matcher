@@ -39,23 +39,11 @@
         .header h1 {
             font-size: 28px;
             margin-bottom: 10px;
-            color: #523665;
         }
 
         .header p {
             font-size: 14px;
             opacity: 0.9;
-        }
-
-        .header-box {
-            background: white;
-            border-radius: 15px;
-            padding: 20px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 20px;
-            flex-wrap: wrap;
         }
 
         .content {
@@ -90,16 +78,7 @@
             transition: all 0.3s ease;
             background: #fff9f5;
         }
-        .logo {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-        }
 
-        .logo img {
-            max-height: 60px;
-            width: auto;
-        }
         .upload-box:hover {
             border-color: #6B4C7A;
             background: #f5f0eb;
@@ -379,22 +358,12 @@
         }
 
         .footer {
+            background: #fff9f5;
+            padding: 20px;
             text-align: center;
-            color: #8B5CF6;
-            font-size: 13px;
-            margin-top: 40px;
-            padding-top: 20px;
-            border-top: 1px solid #e0d5e8;
-        }
-
-        footer a {
-            color: #8B5CF6;
-            text-decoration: none;
-            font-weight: 600;
-        }
-
-        footer a:hover {
-            text-decoration: underline;
+            color: #666;
+            font-size: 12px;
+            border-top: 1px solid #ddd;
         }
 
         @media (max-width: 768px) {
@@ -502,12 +471,7 @@
 
     <div class="container">
         <div class="header">
-            <div class="header-box">
-                <div class="logo">
-                    <img src="https://purles.pl/data/gfx/mask/pol/logo_2_big.svg" alt="Purles Logo">
-                </div>
-                <h1>📊 IDoSell Payment Matcher</h1>
-            </div>
+            <h1>📊 IDoSell Payment Matcher</h1>
             <p>Mapowanie wpłat od klientów do cotygodniowych transz wypłat</p>
         </div>
 
@@ -613,11 +577,7 @@
         </div>
 
         <div class="footer">
-                  <br>
-                  <p style="text-align: center; color: #8B5CF6;">
-            Designed by KS for <strong><a href="https://www.purles.pl" style="color: #8B5CF6; text-decoration: none;">Purlés</a></strong>
-        </p>
-                  <br>
+            ℹ️ Narzędzie przetwarzający dane lokalnie w przeglądarce • Brak przesyłania danych na serwer
         </div>
     </div>
 
@@ -1042,49 +1002,50 @@
             const dataRows = rawData.slice(headerRowIndex + 1);
             console.log(`Dane do przetworzenia: ${dataRows.length} wierszy`);
 
-            const filtered = dataRows
-                .filter(row => {
-                    if (!row || row.length === 0) return false;
-                    
-                    // Szukamy danych o transakcjach - kolumna 11 (ID płatności) musi mieć wartość
-                    const paymentId = String(row[11] || '').trim();
-                    const kwota = row[2];
-                    
-                    const hasData = paymentId && paymentId !== '' && paymentId !== 'NaN' && kwota !== null && kwota !== undefined;
-                    
-                    if (hasData) {
-                        console.log(`✓ Wiersz ma dane: ID=${paymentId}, Kwota=${kwota}`);
-                    }
-                    
-                    return hasData;
-                })
-                .map((row, idx) => {
+            const payouts = [];
+            
+            // Szukam wierszy "Wypłata środków IdoPay na konto"
+            for (let idx = 0; idx < dataRows.length; idx++) {
+                const row = dataRows[idx];
+                if (!row || row.length === 0) continue;
+                
+                const typ = String(row[6] || '').trim();
+                
+                // Jeśli to transza
+                if (typ.includes('Wypłata środków IdoPay na konto')) {
                     const dateAddedStr = String(row[7] || '').trim();
                     const dateBookedStr = String(row[8] || '').trim();
                     const amount = Math.abs(parseFloat(String(row[2] || '0').replace(',', '.')));
                     
+                    // Szukam prowizji za tę transszę - będzie w wierszu przed
+                    let provision = 0;
+                    if (idx > 0 && idx < dataRows.length) {
+                        const prevRow = dataRows[idx - 1];
+                        if (prevRow && String(prevRow[6] || '').includes('Prowizja za wypłatę')) {
+                            provision = Math.abs(parseFloat(String(prevRow[2] || '0').replace(',', '.')));
+                            console.log(`Znaleziona prowizja za transszę: ${provision} zł`);
+                        }
+                    }
+                    
                     const parsed = {
                         dateAdded: parseDate(dateAddedStr),
                         dateBooked: parseDate(dateBookedStr),
-                        amount: amount,
+                        amount: amount + provision, // Kwota NETTO bez prowizji
                         transactionId: String(row[1] || ''),
                         paymentId: String(row[11] || ''),
+                        provision: provision,
                         rowData: row
                     };
 
-                    console.log(`Parsowana transza ${idx}: ${parsed.paymentId} | ${dateBookedStr} | ${amount}`);
-                    return parsed;
-                })
-                .filter(p => {
-                    const valid = p.dateBooked && !isNaN(p.dateBooked.getTime());
-                    if (!valid) {
-                        console.log(`❌ Filtrowana (invalid date): ${p.paymentId}`);
+                    if (parsed.dateBooked && !isNaN(parsed.dateBooked.getTime())) {
+                        payouts.push(parsed);
+                        console.log(`✓ Transza: ${parsed.paymentId} | ${dateBookedStr} | ${amount} zł + ${provision} zł prowizji`);
                     }
-                    return valid;
-                });
+                }
+            }
 
-            console.log(`✅ Załadowano ${filtered.length} transz`);
-            return filtered;
+            console.log(`✅ Załadowano ${payouts.length} transz (z prowizjami)`);
+            return payouts;
         }
 
         function parsePayments(rawData, type) {
@@ -1452,10 +1413,7 @@
                 const cells = [];
                 tr.querySelectorAll('td').forEach((td, idx) => {
                     let text = td.textContent.trim();
-                    // Najpierw zamień WSZYSTKIE kropki na przecinki
-                    text = text.replace(/\./g, ',');
-                    // Potem cofnij przecinki na kropki tylko w datach (format: d,dd,yyyy)
-                    text = text.replace(/(\d{1,2}),(\d{2}),(\d{4})/g, '$1.$2.$3');
+                    text = text.replace(/(\d+)\.(\d+)/g, '$1,$2');
                     text = text.replace(/\n/g, ' ').replace(/\s+/g, ' ');
                     cells.push('"' + text.replace(/"/g, '""') + '"');
                 });
@@ -1481,30 +1439,9 @@
                 const cells = [];
                 tr.querySelectorAll('td').forEach((td, idx) => {
                     let text = td.textContent.trim();
-                    
-                    // Jeśli to kolumna z kwotą lub ID transzy
-                    const columnHeaders = ['Kwota transzy', 'Kwota wpłat', 'Prowizje', 'Różnica', '(zł)', 'Różnica', 'ID transzy'];
-                    const isAmountColumn = columnHeaders.some(h => {
-                        const th = Array.from(table.querySelectorAll('thead th'))[Array.from(tr.querySelectorAll('td')).indexOf(td)];
-                        return th && th.textContent.includes(h);
-                    });
-                    
-                    if (isAmountColumn && text !== '' && text !== '-' && !text.includes('Brak')) {
-                        // Zamień przecinek na kropkę i skonwertuj na liczbę
-                        const numValue = parseFloat(text.replace(',', '.'));
-                        if (!isNaN(numValue)) {
-                            cells.push(numValue);
-                        } else {
-                            cells.push(text);
-                        }
-                    } else {
-                        // Dla dat i tekstów: zamień WSZYSTKIE kropki na przecinki
-                        text = text.replace(/\./g, ',');
-                        // Cofnij przecinki na kropki tylko w datach (format: d,dd,yyyy)
-                        text = text.replace(/(\d{1,2}),(\d{2}),(\d{4})/g, '$1.$2.$3');
-                        text = text.replace(/\n/g, ' ').replace(/\s+/g, ' ');
-                        cells.push(text);
-                    }
+                    text = text.replace(/(\d+)\.(\d+)/g, '$1,$2');
+                    text = text.replace(/\n/g, ' ').replace(/\s+/g, ' ');
+                    cells.push(text);
                 });
                 data.push(cells);
             });
@@ -1535,12 +1472,7 @@
         function formatDate(date) {
             if (!date) return '-';
             const d = new Date(date);
-            const day = String(d.getDate()).padStart(2, '0');
-            const month = String(d.getMonth() + 1).padStart(2, '0');
-            const year = d.getFullYear();
-            const hours = String(d.getHours()).padStart(2, '0');
-            const minutes = String(d.getMinutes()).padStart(2, '0');
-            return `${day}.${month}.${year} ${hours}:${minutes}`;
+            return d.toLocaleDateString('pl-PL') + ' ' + d.toLocaleTimeString('pl-PL', {hour: '2-digit', minute: '2-digit'});
         }
 
         function clearAll() {
