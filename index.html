@@ -21,7 +21,7 @@
         }
 
         .container {
-            max-width: 1400px;
+            max-width: 1600px;
             margin: 0 auto;
             background: #F3E8E1;
             border-radius: 12px;
@@ -64,8 +64,8 @@
 
         .upload-container {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 15px;
             margin-bottom: 30px;
         }
 
@@ -471,8 +471,9 @@
 
     <div class="container">
         <div class="header">
-            <h1>📊 IDoSell Payment Matcher</h1>
+            <h1>📊 IDoSell Payment Matcher v2.0</h1>
             <p>Mapowanie wpłat od klientów do cotygodniowych transz wypłat</p>
+            <p style="font-size: 12px; margin-top: 8px; opacity: 0.8;">✅ Poprawka: prowizje kart pobierane z pliku wypłat | obsługa zwrotów | prowizja za wypłatę</p>
         </div>
 
         <div class="content">
@@ -495,7 +496,7 @@
                         <label for="blikFile">
                             <div class="upload-icon">📱</div>
                             <h3>BLIK IdoPay</h3>
-                            <p>Wpłaty BLIK od klientów</p>
+                            <p>Wpłaty BLIK</p>
                             <input type="file" id="blikFile" accept=".ods,.xlsx,.xls,.csv">
                             <div class="file-name" id="blikFileName"></div>
                         </label>
@@ -503,19 +504,29 @@
 
                     <div class="upload-box">
                         <label for="paybyFile">
-                            <div class="upload-icon">💳</div>
+                            <div class="upload-icon">⚡</div>
                             <h3>PayByLink IdoPay</h3>
-                            <p>Wpłaty szybkie przelewami</p>
+                            <p>Szybkie przelewy</p>
                             <input type="file" id="paybyFile" accept=".ods,.xlsx,.xls,.csv">
                             <div class="file-name" id="paybyFileName"></div>
                         </label>
                     </div>
 
                     <div class="upload-box">
+                        <label for="cardsFile">
+                            <div class="upload-icon">💳</div>
+                            <h3>Karty płatnicze IdoPay</h3>
+                            <p>Wpłaty kartami</p>
+                            <input type="file" id="cardsFile" accept=".ods,.xlsx,.xls,.csv">
+                            <div class="file-name" id="cardsFileName"></div>
+                        </label>
+                    </div>
+
+                    <div class="upload-box">
                         <label for="ordersFile">
                             <div class="upload-icon">📋</div>
-                            <h3>Zamówienia (klienci)</h3>
-                            <p>Export zamówień z danymi klientów</p>
+                            <h3>Zamówienia (opcjonalnie)</h3>
+                            <p>Dane klientów</p>
                             <input type="file" id="ordersFile" accept=".csv">
                             <div class="file-name" id="ordersFileName"></div>
                         </label>
@@ -545,8 +556,10 @@
                 </div>
 
                 <div class="button-group">
-                    <button onclick="exportToCSV()">📥 Pobierz CSV</button>
-                    <button onclick="exportToODS()">📥 Pobierz ODS</button>
+                    <button onclick="exportToCSV()">📥 CSV (podsumowanie)</button>
+                    <button onclick="exportDetailedCSV()">📥 CSV (szczegóły)</button>
+                    <button onclick="exportToODS()">📥 ODS (tekst)</button>
+                    <button onclick="exportToODSNumeric()">📥 ODS (liczby)</button>
                     <button onclick="printResults()">🖨️ Drukuj</button>
                 </div>
 
@@ -560,6 +573,7 @@
                                 <th>Kwota transzy (zł)</th>
                                 <th>Wpłaty od klientów</th>
                                 <th>Data płatności</th>
+                                <th>Data złożenia</th>
                                 <th>Klient</th>
                                 <th>Kwota wpłat (zł)</th>
                                 <th>Prowizje (zł)</th>
@@ -586,7 +600,12 @@
         let parsedData = {
             payouts: [],
             blik: [],
-            payby: []
+            payby: [],
+            cards: [],
+            // NOWE: dane z pliku wypłat do prawidłowego obliczania
+            prowizjeOdWplat: [],  // wiersze "Prowizja od wpłaty IdoPay"
+            zwroty: [],           // wiersze "Zwrot"
+            prowizjeZaWyplate: [] // wiersze "Prowizja za wypłatę"
         };
         let ordersData = {};
         let lastResults = null;
@@ -605,7 +624,7 @@
             });
             
             // Zbieraj miesiące z wpłat
-            [...parsedData.blik, ...parsedData.payby].forEach(p => {
+            [...parsedData.blik, ...parsedData.payby, ...parsedData.cards].forEach(p => {
                 if (p.dateBooked) {
                     const monthKey = p.dateBooked.getFullYear() + '-' + String(p.dateBooked.getMonth() + 1).padStart(2, '0');
                     months.add(monthKey);
@@ -687,17 +706,43 @@
             const filteredPayby = parsedData.payby.filter(p => {
                 return p.dateBooked > periodStartPayment && p.dateBooked <= endDate;
             });
+
+            const filteredCards = parsedData.cards.filter(p => {
+                return p.dateBooked > periodStartPayment && p.dateBooked <= endDate;
+            });
             
-            console.log(`Filtrowane wpłaty: ${filteredBlik.length} BLIK + ${filteredPayby.length} PayByLink`);
+            // NOWE: Filtruj prowizje i zwroty
+            const filteredProwizje = parsedData.prowizjeOdWplat.filter(p => {
+                return p.dateBooked > periodStartPayment && p.dateBooked <= endDate;
+            });
+            
+            const filteredZwroty = parsedData.zwroty.filter(z => {
+                return z.dateBooked > periodStartPayment && z.dateBooked <= endDate;
+            });
+            
+            const filteredProwZaWyplate = parsedData.prowizjeZaWyplate.filter(p => {
+                return p.dateBooked > periodStartPayment && p.dateBooked <= endDate;
+            });
+            
+            console.log(`Filtrowane wpłaty: ${filteredBlik.length} BLIK + ${filteredPayby.length} PayByLink + ${filteredCards.length} Karty`);
+            console.log(`Filtrowane prowizje: ${filteredProwizje.length}, zwroty: ${filteredZwroty.length}`);
             
             // Tymczasowo zastąp dane
             const originalPayouts = parsedData.payouts;
             const originalBlik = parsedData.blik;
             const originalPayby = parsedData.payby;
+            const originalCards = parsedData.cards;
+            const originalProwizje = parsedData.prowizjeOdWplat;
+            const originalZwroty = parsedData.zwroty;
+            const originalProwZaWyplate = parsedData.prowizjeZaWyplate;
             
             parsedData.payouts = filteredPayouts;
             parsedData.blik = filteredBlik;
             parsedData.payby = filteredPayby;
+            parsedData.cards = filteredCards;
+            parsedData.prowizjeOdWplat = filteredProwizje;
+            parsedData.zwroty = filteredZwroty;
+            parsedData.prowizjeZaWyplate = filteredProwZaWyplate;
             
             // Mapowanie i wyświetlanie
             const results = mapPayments();
@@ -707,6 +752,10 @@
             parsedData.payouts = originalPayouts;
             parsedData.blik = originalBlik;
             parsedData.payby = originalPayby;
+            parsedData.cards = originalCards;
+            parsedData.prowizjeOdWplat = originalProwizje;
+            parsedData.zwroty = originalZwroty;
+            parsedData.prowizjeZaWyplate = originalProwZaWyplate;
             
             document.getElementById('resultsSection').classList.add('show');
             
@@ -727,6 +776,10 @@
 
         document.getElementById('paybyFile').addEventListener('change', function(e) {
             updateFileName('paybyFileName', this.files[0]);
+        });
+
+        document.getElementById('cardsFile').addEventListener('change', function(e) {
+            updateFileName('cardsFileName', this.files[0]);
         });
 
         document.getElementById('ordersFile').addEventListener('change', function(e) {
@@ -769,9 +822,11 @@
             
             // Indeksy kolumn
             const orderNumIdx = headers.indexOf('Nr zamówienia');
-            const firstNameIdx = headers.indexOf('Biling-Imię');
-            const lastNameIdx = headers.indexOf('Biling-Nazwisko');
-            const companyIdx = headers.indexOf('Biling-Nazwa firmy');
+            const customerTypeIdx = headers.indexOf('Typ klienta'); // Kolumna E (indeks 4)
+            const firstNameIdx = headers.indexOf('Biling-Imię'); // Kolumna F (indeks 5)
+            const lastNameIdx = headers.indexOf('Biling-Nazwisko'); // Kolumna G (indeks 6)
+            const companyIdx = headers.indexOf('Biling-Nazwa firmy'); // Kolumna H (indeks 7)
+            const nipIdx = headers.indexOf('Biling-NIP'); // Kolumna I (indeks 8)
             
             if (orderNumIdx === -1) {
                 console.error('Nie znaleziono kolumny "Nr zamówienia"');
@@ -779,7 +834,7 @@
                 return orders;
             }
             
-            console.log(`Kolumny: OrderNum=${orderNumIdx}, FirstName=${firstNameIdx}, LastName=${lastNameIdx}, Company=${companyIdx}`);
+            console.log(`Kolumny: OrderNum=${orderNumIdx}, CustomerType=${customerTypeIdx}, FirstName=${firstNameIdx}, LastName=${lastNameIdx}, Company=${companyIdx}, NIP=${nipIdx}`);
             
             // Parsowanie wierszy
             for (let i = 1; i < lines.length; i++) {
@@ -795,21 +850,30 @@
                 if (cells.length > orderNumIdx) {
                     const orderNum = cells[orderNumIdx].trim();
                     if (orderNum && !isNaN(orderNum)) {
+                        const customerType = customerTypeIdx >= 0 ? cells[customerTypeIdx].trim() : '';
                         const firstName = firstNameIdx >= 0 ? cells[firstNameIdx].trim() : '';
                         const lastName = lastNameIdx >= 0 ? cells[lastNameIdx].trim() : '';
                         const company = companyIdx >= 0 ? cells[companyIdx].trim() : '';
+                        const nip = nipIdx >= 0 ? cells[nipIdx].trim() : '';
                         
-                        // Nazwisko klienta
-                        let clientName = firstName + ' ' + lastName;
-                        if (company && company !== '') {
+                        // Nazwisko klienta - priorytet: firma z NIPem > firma > imię i nazwisko
+                        let clientName = '';
+                        if (customerType === 'Firma' && company) {
                             clientName = company;
+                            if (nip) {
+                                clientName += ` (NIP: ${nip})`;
+                            }
+                        } else {
+                            clientName = (firstName + ' ' + lastName).trim();
                         }
                         
                         orders[parseInt(orderNum)] = {
                             firstName: firstName,
                             lastName: lastName,
                             company: company,
-                            fullName: clientName.trim()
+                            nip: nip,
+                            customerType: customerType,
+                            fullName: clientName
                         };
                     }
                 }
@@ -914,6 +978,7 @@
             const payoutFile = document.getElementById('payoutFile').files[0];
             const blikFile = document.getElementById('blikFile').files[0];
             const paybyFile = document.getElementById('paybyFile').files[0];
+            const cardsFile = document.getElementById('cardsFile').files[0];
             const ordersFile = document.getElementById('ordersFile').files[0];
 
             if (!payoutFile || !blikFile || !paybyFile) {
@@ -922,7 +987,7 @@
             }
 
             if (!ordersFile) {
-                showAlert('Ostrzeżenie', 'Plik zamówień nie został załadowany. Dane klientów nie będą dostępne.', 'warning');
+                showAlert('Info', 'Plik zamówień nie został załadowany. Dane klientów z orders.csv nie będą dostępne (tylko z plików wpłat).', 'info');
             }
 
             document.getElementById('loadingIndicator').style.display = 'block';
@@ -936,6 +1001,14 @@
                 parsedData.payouts = parsePayouts(payoutData);
                 parsedData.blik = parsePayments(blikData, 'BLIK');
                 parsedData.payby = parsePayments(paybyData, 'PayByLink');
+                
+                // Parsowanie kart jeśli został załadowany
+                if (cardsFile) {
+                    const cardsData = await readFile(cardsFile);
+                    parsedData.cards = parsePayments(cardsData, 'Karta');
+                } else {
+                    parsedData.cards = [];
+                }
                 
                 // Parsowanie zamówień jeśli został załadowany
                 if (ordersFile) {
@@ -983,7 +1056,7 @@
         }
 
         function parsePayouts(rawData) {
-            console.log('=== PARSEOWANIE PAYOUTS ===');
+            console.log('=== PARSEOWANIE PAYOUTS (ROZSZERZONE) ===');
             console.log(`Surowe dane: ${rawData.length} wierszy`);
             
             // Nagłówek jest w wierszu 3 (indeks 3)
@@ -1003,48 +1076,96 @@
             console.log(`Dane do przetworzenia: ${dataRows.length} wierszy`);
 
             const payouts = [];
+            const prowizjeOdWplat = [];
+            const zwroty = [];
+            const prowizjeZaWyplate = [];
             
-            // Szukam wierszy "Wypłata środków IdoPay na konto"
             for (let idx = 0; idx < dataRows.length; idx++) {
                 const row = dataRows[idx];
                 if (!row || row.length === 0) continue;
                 
                 const typ = String(row[6] || '').trim();
+                const dateAddedStr = String(row[7] || '').trim();
+                const dateBookedStr = String(row[8] || '').trim();
+                const amount = parseFloat(String(row[2] || '0').replace(',', '.'));
+                const orderNumber = String(row[0] || '').trim();
+                const paymentId = String(row[11] || '');
                 
-                // Jeśli to transza
+                // TRANSZE - Wypłaty na konto
                 if (typ.includes('Wypłata środków IdoPay na konto')) {
-                    const dateAddedStr = String(row[7] || '').trim();
-                    const dateBookedStr = String(row[8] || '').trim();
-                    const amount = Math.abs(parseFloat(String(row[2] || '0').replace(',', '.')));
-                    
-                    // Szukam prowizji za tę transszę - będzie w wierszu przed
-                    let provision = 0;
-                    if (idx > 0 && idx < dataRows.length) {
-                        const prevRow = dataRows[idx - 1];
-                        if (prevRow && String(prevRow[6] || '').includes('Prowizja za wypłatę')) {
-                            provision = Math.abs(parseFloat(String(prevRow[2] || '0').replace(',', '.')));
-                            console.log(`Znaleziona prowizja za transszę: ${provision} zł`);
-                        }
-                    }
-                    
                     const parsed = {
                         dateAdded: parseDate(dateAddedStr),
                         dateBooked: parseDate(dateBookedStr),
-                        amount: amount + provision, // Kwota NETTO bez prowizji
+                        amount: Math.abs(amount),
                         transactionId: String(row[1] || ''),
-                        paymentId: String(row[11] || ''),
-                        provision: provision,
+                        paymentId: paymentId,
                         rowData: row
                     };
 
                     if (parsed.dateBooked && !isNaN(parsed.dateBooked.getTime())) {
                         payouts.push(parsed);
-                        console.log(`✓ Transza: ${parsed.paymentId} | ${dateBookedStr} | ${amount} zł + ${provision} zł prowizji`);
+                        console.log(`✓ Transza: ${parsed.paymentId} | ${dateBookedStr} | ${Math.abs(amount)} zł`);
+                    }
+                }
+                
+                // PROWIZJE OD WPŁAT - to jest klucz do prawidłowego rozliczenia!
+                else if (typ === 'Prowizja od wpłaty IdoPay') {
+                    const parsed = {
+                        dateAdded: parseDate(dateAddedStr),
+                        dateBooked: parseDate(dateBookedStr),
+                        amount: Math.abs(amount), // zapisujemy jako wartość dodatnią
+                        paymentId: paymentId,
+                        rowData: row
+                    };
+                    
+                    if (parsed.dateBooked && !isNaN(parsed.dateBooked.getTime())) {
+                        prowizjeOdWplat.push(parsed);
+                    }
+                }
+                
+                // ZWROTY
+                else if (typ === 'Zwrot') {
+                    const parsed = {
+                        dateAdded: parseDate(dateAddedStr),
+                        dateBooked: parseDate(dateBookedStr),
+                        amount: amount, // ujemna wartość
+                        orderNumber: orderNumber,
+                        paymentId: paymentId,
+                        rowData: row
+                    };
+                    
+                    if (parsed.dateBooked && !isNaN(parsed.dateBooked.getTime())) {
+                        zwroty.push(parsed);
+                        console.log(`✓ Zwrot: zamówienie ${orderNumber} | ${amount} zł | ${dateBookedStr}`);
+                    }
+                }
+                
+                // PROWIZJE ZA WYPŁATĘ (0.30 zł za każdą transzę)
+                else if (typ === 'Prowizja za wypłatę') {
+                    const parsed = {
+                        dateAdded: parseDate(dateAddedStr),
+                        dateBooked: parseDate(dateBookedStr),
+                        amount: Math.abs(amount), // 0.30 zł
+                        paymentId: paymentId,
+                        rowData: row
+                    };
+                    
+                    if (parsed.dateBooked && !isNaN(parsed.dateBooked.getTime())) {
+                        prowizjeZaWyplate.push(parsed);
                     }
                 }
             }
 
-            console.log(`✅ Załadowano ${payouts.length} transz (z prowizjami)`);
+            console.log(`✅ Załadowano ${payouts.length} transz`);
+            console.log(`✅ Załadowano ${prowizjeOdWplat.length} prowizji od wpłat`);
+            console.log(`✅ Załadowano ${zwroty.length} zwrotów`);
+            console.log(`✅ Załadowano ${prowizjeZaWyplate.length} prowizji za wypłatę`);
+            
+            // Zapisz do globalnych danych
+            parsedData.prowizjeOdWplat = prowizjeOdWplat;
+            parsedData.zwroty = zwroty;
+            parsedData.prowizjeZaWyplate = prowizjeZaWyplate;
+            
             return payouts;
         }
 
@@ -1075,19 +1196,21 @@
                 })
                 .map((row, idx) => {
                     const orderNumber = String(row[0] || '').trim();
-                    const dateStr = String(row[8] || '').trim();
+                    const dateAddedStr = String(row[7] || '').trim(); // KOLUMNA H - Data dodania!
+                    const dateBookedStr = String(row[8] || '').trim(); // Kolumna I - Data zaksięgowania
                     const amount = parseFloat(String(row[2] || '0').replace(',', '.'));
                     const commission = parseFloat(String(row[13] || '0').replace(',', '.'));
                     const transactionId = String(row[1] || '');
                     
                     if (idx < 3 || idx % 30 === 0) {
-                        console.log(`Wpłata ${idx}: #${orderNumber} | ${dateStr} | ${amount} zł`);
+                        console.log(`Wpłata ${idx}: #${orderNumber} | Dodana: ${dateAddedStr} | Zaksięgowana: ${dateBookedStr} | ${amount} zł`);
                     }
                     
                     return {
                         orderNumber,
                         transactionId,
-                        dateBooked: parseDate(dateStr),
+                        dateAdded: parseDate(dateAddedStr), // Data złożenia zamówienia
+                        dateBooked: parseDate(dateBookedStr), // Data zaksięgowania
                         amount,
                         commission,
                         type,
@@ -1132,12 +1255,12 @@
             if (parsedData.payouts.length === 0) {
                 errors.push('Brak danych w pliku "Wypłaty do nas"');
             }
-            if (parsedData.blik.length === 0 && parsedData.payby.length === 0) {
+            if (parsedData.blik.length === 0 && parsedData.payby.length === 0 && parsedData.cards.length === 0) {
                 errors.push('Brak danych w plikach z wpłatami od klientów');
             }
 
             // Sprawdzenie duplikatów w wpłatach
-            const allPayments = [...parsedData.blik, ...parsedData.payby];
+            const allPayments = [...parsedData.blik, ...parsedData.payby, ...parsedData.cards];
             const duplicateOrders = {};
             allPayments.forEach(p => {
                 duplicateOrders[p.orderNumber] = (duplicateOrders[p.orderNumber] || 0) + 1;
@@ -1160,16 +1283,19 @@
 
         // ===== MAPOWANIE WPŁAT =====
         function mapPayments() {
-            const allPayments = [...parsedData.blik, ...parsedData.payby];
+            const allPayments = [...parsedData.blik, ...parsedData.payby, ...parsedData.cards];
             
-            console.log('\n=== MAPOWANIE WPŁAT ===');
+            console.log('\n=== MAPOWANIE WPŁAT (POPRAWIONA WERSJA) ===');
             console.log(`Transze do mapowania: ${parsedData.payouts.length}`);
             console.log(`Wpłaty BLIK: ${parsedData.blik.length}`);
             console.log(`Wpłaty PayByLink: ${parsedData.payby.length}`);
+            console.log(`Wpłaty Karty: ${parsedData.cards.length}`);
             console.log(`Razem wpłat: ${allPayments.length}`);
+            console.log(`Prowizje od wpłat (z pliku wypłat): ${parsedData.prowizjeOdWplat.length}`);
+            console.log(`Zwroty: ${parsedData.zwroty.length}`);
+            console.log(`Prowizje za wypłatę: ${parsedData.prowizjeZaWyplate.length}`);
 
-            // Sortuję transze od najstarszej do najnowszej (bo mogą być w odwrotnym porządku)
-            // WAŻNE: Sortuję po Data DODANIA, nie zaksięgowania!
+            // Sortuję transze od najstarszej do najnowszej
             const sortedPayouts = [...parsedData.payouts].sort((a, b) => a.dateAdded - b.dateAdded);
             
             console.log('\nTransze (posortowane po Data Dodania):');
@@ -1182,51 +1308,76 @@
             sortedPayouts.forEach((payout, index) => {
                 console.log(`\n--- Mapowanie transzy ${index} (Dodana: ${formatDate(payout.dateAdded)}) ---`);
                 
-                // Okres: od daty dodania poprzedniej transzy (exclusive) do daty dodania bieżącej transzy (inclusive)
                 let periodStart;
-                let periodEnd = payout.dateAdded; // UŻYWAMY Data Dodania, nie zaksięgowania!
+                let periodEnd = payout.dateAdded;
 
                 if (index === 0) {
-                    // Dla pierwszej transzy - od początku czasów
                     periodStart = new Date(2000, 0, 1);
                     console.log(`Pierwszy okres: od ${formatDate(periodStart)} do ${formatDate(periodEnd)}`);
                 } else {
-                    periodStart = sortedPayouts[index - 1].dateAdded; // POPRZEDNIA TRANSZA też po Data Dodania!
+                    periodStart = sortedPayouts[index - 1].dateAdded;
                     console.log(`Okres: od ${formatDate(periodStart)} (excl) do ${formatDate(periodEnd)} (incl)`);
                 }
 
                 // Znalezienie wpłat w danym oknie czasowym
-                // WAŻNE: Wpłaty mapujemy po Data Zaksięgowania (kiedy faktycznie trafiły)
                 const matchingPayments = allPayments.filter(p => {
-                    const isMatch = p.dateBooked > periodStart && p.dateBooked <= periodEnd;
-                    return isMatch;
+                    return p.dateBooked > periodStart && p.dateBooked <= periodEnd;
                 });
 
                 console.log(`✓ Znaleziono ${matchingPayments.length} wpłat`);
-                matchingPayments.slice(0, 5).forEach(p => {
-                    console.log(`  - Zamówienie ${p.orderNumber} (${p.type}): Zaksięgowana: ${formatDate(p.dateBooked)} | ${p.amount} zł`);
+                
+                // NOWE: Prowizje z pliku wypłat (NIE z kolumny w plikach płatności!)
+                const matchingProwizje = parsedData.prowizjeOdWplat.filter(p => {
+                    return p.dateBooked > periodStart && p.dateBooked <= periodEnd;
                 });
-                if (matchingPayments.length > 5) {
-                    console.log(`  ... i ${matchingPayments.length - 5} więcej`);
-                }
+                
+                // NOWE: Zwroty z pliku wypłat
+                const matchingZwroty = parsedData.zwroty.filter(z => {
+                    return z.dateBooked > periodStart && z.dateBooked <= periodEnd;
+                });
+                
+                // NOWE: Prowizja za wypłatę z pliku wypłat
+                const matchingProwZaWyplate = parsedData.prowizjeZaWyplate.filter(p => {
+                    return p.dateBooked > periodStart && p.dateBooked <= periodEnd;
+                });
 
-                // Obliczenia
-                // WAŻNE: Wpłaty to kwoty brutto, ale transza to NETTO (po prowizjach)
-                // Dlatego: Kwota netto = suma wpłat - suma prowizji
+                // Obliczenia - PRAWIDŁOWA METODA
                 const totalAmount = matchingPayments.reduce((sum, p) => sum + p.amount, 0);
-                const totalCommission = matchingPayments.reduce((sum, p) => sum + p.commission, 0);
-                const totalNetAmount = totalAmount - totalCommission; // NETTO dla porównania z transszą
+                
+                // Prowizje z pliku wypłat (prawidłowe!)
+                const totalCommissionReal = matchingProwizje.reduce((sum, p) => sum + p.amount, 0);
+                
+                // Prowizje z kolumny w plikach (do wyświetlenia różnicy)
+                const totalCommissionFiles = matchingPayments.reduce((sum, p) => sum + p.commission, 0);
+                
+                // Zwroty (ujemne wartości)
+                const totalZwroty = matchingZwroty.reduce((sum, z) => sum + z.amount, 0);
+                
+                // Prowizja za wypłatę
+                const totalProwZaWyplate = matchingProwZaWyplate.reduce((sum, p) => sum + p.amount, 0);
+                
+                // NETTO = Wpłaty - Prowizje od wpłat + Zwroty - Prowizja za wypłatę
+                const totalNetAmount = totalAmount - totalCommissionReal + totalZwroty - totalProwZaWyplate;
                 
                 const difference = payout.amount - totalNetAmount;
+
+                console.log(`  Suma wpłat BRUTTO: ${totalAmount.toFixed(2)} zł`);
+                console.log(`  Prowizje z pliku wypłat: ${totalCommissionReal.toFixed(2)} zł (${matchingProwizje.length} wierszy)`);
+                console.log(`  Prowizje z plików BLIK/PayBy/Karty: ${totalCommissionFiles.toFixed(2)} zł (NIEUŻYWANE)`);
+                console.log(`  Zwroty: ${totalZwroty.toFixed(2)} zł (${matchingZwroty.length} wierszy)`);
+                console.log(`  Prowizja za wypłatę: ${totalProwZaWyplate.toFixed(2)} zł`);
+                console.log(`  NETTO obliczone: ${totalNetAmount.toFixed(2)} zł`);
+                console.log(`  Kwota transzy: ${payout.amount.toFixed(2)} zł`);
+                console.log(`  RÓŻNICA: ${difference.toFixed(2)} zł`);
 
                 // Status
                 let status = 'ok';
                 let issues = [];
 
-                if (Math.abs(difference) > 0.01) { // tolerancja zaokrąglenia
+                if (Math.abs(difference) > 0.02) { // tolerancja zaokrąglenia 2 grosze
                     status = 'warning';
                     if (difference < 0) {
-                        issues.push(`⚠️ UJEMNA RÓŻNICA: IDoSell pobrał dodatkowe ${Math.abs(difference).toFixed(2)} zł`);
+                        issues.push(`⚠️ UJEMNA RÓŻNICA: ${Math.abs(difference).toFixed(2)} zł`);
                     } else {
                         issues.push(`Różnica: +${difference.toFixed(2)} zł`);
                     }
@@ -1237,9 +1388,10 @@
                     issues.push('Brak powiązanych wpłat od klientów');
                 }
 
-                const negativePayments = matchingPayments.filter(p => p.amount < 0);
-                if (negativePayments.length > 0) {
-                    issues.push(`${negativePayments.length} ujemne kwoty (zwroty?)`);
+                // Info o zwrotach
+                if (matchingZwroty.length > 0) {
+                    const zwrotyInfo = matchingZwroty.map(z => `#${z.orderNumber}: ${z.amount.toFixed(2)} zł`).join(', ');
+                    issues.push(`Zwroty: ${zwrotyInfo}`);
                 }
 
                 console.log(`Status: ${status} | Różnica: ${difference.toFixed(2)} zł`);
@@ -1247,11 +1399,16 @@
                 results.push({
                     payout,
                     matchingPayments,
+                    matchingZwroty,        // NOWE
+                    matchingProwizje,      // NOWE
                     status,
                     issues,
                     totalAmount,           // Brutto
-                    totalCommission,       // Prowizje
-                    totalNetAmount,        // Netto
+                    totalCommission: totalCommissionReal,  // Prowizje z pliku wypłat
+                    totalCommissionFiles,  // Prowizje z plików (do porównania)
+                    totalZwroty,           // NOWE
+                    totalProwZaWyplate,    // NOWE
+                    totalNetAmount,        // Netto (prawidłowe)
                     difference
                 });
             });
@@ -1299,9 +1456,12 @@
                             row.style.fontWeight = 'bold';
                         }
                         
-                        // Dane klienta
+                        // Dane klienta - z orders.csv (opcjonalnie)
                         const clientInfo = ordersData[payment.orderNumber];
                         const clientName = clientInfo ? clientInfo.fullName : '-';
+                        
+                        // Data złożenia - TERAZ Z PLIKÓW WPŁAT (kolumna H - Data dodania)
+                        const orderDate = payment.dateAdded ? formatDate(payment.dateAdded) : '-';
                         
                         row.innerHTML = `
                             <td>${isFirstPayment ? `<span class="status-badge ${statusClass}">${result.status === 'ok' ? '✅ OK' : result.status === 'warning' ? '⚠️ UWAGA' : '❌ BŁĄD'}</span>` : ''}</td>
@@ -1312,6 +1472,7 @@
                                 <a href="https://purles.pl/panel/orderd.php?idt=${payment.orderNumber}" target="_blank" class="order-link">#${payment.orderNumber}</a> (${payment.type})
                             </td>
                             <td>${formatDate(payment.dateBooked)}</td>
+                            <td>${orderDate}</td>
                             <td>${clientName}</td>
                             <td class="text-right">${payment.amount.toFixed(2)}</td>
                             <td class="text-right">-${payment.commission.toFixed(2)}</td>
@@ -1339,6 +1500,9 @@
                         <td>${result.payout.paymentId}</td>
                         <td class="text-right">${result.payout.amount.toFixed(2)}</td>
                         <td style="color: #999; font-style: italic;">Brak powiązanych zamówień</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>-</td>
                         <td class="text-right">0.00</td>
                         <td class="text-right">0.00</td>
                         <td class="text-right ${Math.abs(result.difference) > 0.01 ? (result.difference < 0 ? 'negative-discrepancy' : 'discrepancy') : ''}">${result.difference.toFixed(2)}</td>
@@ -1350,8 +1514,12 @@
             });
 
             // Pokaż modal z podsumowaniem
-            const hasDiscrepancies = issuesCount > 0;
+            const hasDiscrepancies = results.some(r => Math.abs(r.difference) > 0.02);
             showSummaryModal(hasDiscrepancies, totalDifferences);
+
+            // Oblicz dodatkowe sumy
+            const totalZwroty = results.reduce((sum, r) => sum + (r.totalZwroty || 0), 0);
+            const totalProwZaWyplate = results.reduce((sum, r) => sum + (r.totalProwZaWyplate || 0), 0);
 
             // Podsumowanie
             summaryBox.innerHTML = `
@@ -1368,16 +1536,24 @@
                     <div class="stat-value">${totalPaymentsBrutto.toFixed(2)}</div>
                 </div>
                 <div class="stat">
+                    <div class="stat-label">Prowizje od wpłat (zł)</div>
+                    <div class="stat-value">${(totalPaymentsBrutto - totalPaymentsNetto - totalZwroty + totalProwZaWyplate).toFixed(2)}</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Zwroty (zł)</div>
+                    <div class="stat-value">${totalZwroty.toFixed(2)}</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Prowizje za wypłatę (zł)</div>
+                    <div class="stat-value">-${totalProwZaWyplate.toFixed(2)}</div>
+                </div>
+                <div class="stat">
                     <div class="stat-label">Wpłaty NETTO (zł)</div>
                     <div class="stat-value">${totalPaymentsNetto.toFixed(2)}</div>
                 </div>
                 <div class="stat">
-                    <div class="stat-label">Razem prowizje (zł)</div>
-                    <div class="stat-value">${(totalPaymentsBrutto - totalPaymentsNetto).toFixed(2)}</div>
-                </div>
-                <div class="stat">
                     <div class="stat-label">Razem różnice (zł)</div>
-                    <div class="stat-value">${totalDifferences.toFixed(2)}</div>
+                    <div class="stat-value" style="color: ${Math.abs(totalDifferences) < 0.1 ? 'green' : 'red'}; font-weight: bold;">${totalDifferences.toFixed(2)}</div>
                 </div>
             `;
         }
@@ -1398,58 +1574,164 @@
 
         // ===== EXPORT =====
         function exportToCSV() {
-            const table = document.getElementById('resultsTable');
+            // Pobieramy dane bezpośrednio z lastResults zamiast z tabeli HTML
+            // To daje pełną kontrolę nad formatowaniem
+            
+            if (!lastResults || lastResults.length === 0) {
+                alert('Brak danych do eksportu. Najpierw wykonaj mapowanie.');
+                return;
+            }
+            
             const csv = [];
             
             // Nagłówki
-            const headers = [];
-            table.querySelectorAll('thead th').forEach(th => {
-                headers.push('"' + th.textContent.trim().replace(/"/g, '""') + '"');
+            csv.push([
+                'ID Transzy',
+                'Data transzy',
+                'Kwota transzy (zł)',
+                'Suma wpłat BRUTTO (zł)',
+                'Suma prowizji (zł)',
+                'Suma zwrotów (zł)',
+                'Prow. za wypłatę (zł)',
+                'NETTO obliczone (zł)',
+                'Różnica (zł)',
+                'Status',
+                'Liczba wpłat',
+                'Typy płatności'
+            ].map(h => '"' + h + '"').join(';'));
+            
+            // Dane w polskim formacie
+            lastResults.forEach(result => {
+                const row = [
+                    result.payout.paymentId || '-',
+                    formatDateShort(result.payout.dateBooked),
+                    formatAmountPL(result.payout.amount),
+                    formatAmountPL(result.totalAmount),
+                    formatAmountPL(result.totalCommission),
+                    formatAmountPL(result.totalZwroty || 0),
+                    formatAmountPL(result.totalProwZaWyplate || 0),
+                    formatAmountPL(result.totalNetAmount),
+                    formatAmountPL(result.difference),
+                    Math.abs(result.difference) < 0.02 ? 'OK' : 'ROZBIEŻNOŚĆ',
+                    result.matchingPayments.length,
+                    [...new Set(result.matchingPayments.map(p => p.type))].join(', ')
+                ];
+                csv.push(row.map(cell => '"' + String(cell).replace(/"/g, '""') + '"').join(';'));
             });
-            csv.push(headers.join(';'));
-
-            // Dane
-            table.querySelectorAll('tbody tr').forEach(tr => {
-                const cells = [];
-                tr.querySelectorAll('td').forEach((td, idx) => {
-                    let text = td.textContent.trim();
-                    text = text.replace(/(\d+)\.(\d+)/g, '$1,$2');
-                    text = text.replace(/\n/g, ' ').replace(/\s+/g, ' ');
-                    cells.push('"' + text.replace(/"/g, '""') + '"');
-                });
-                csv.push(cells.join(';'));
-            });
-
-            downloadFile(csv.join('\n'), 'idosell-mapowanie-' + new Date().toISOString().split('T')[0] + '.csv', 'text/csv;charset=utf-8');
+            
+            // BOM dla UTF-8 (żeby Excel poprawnie odczytał polskie znaki)
+            const BOM = '\uFEFF';
+            downloadFile(BOM + csv.join('\n'), 'idosell-mapowanie-' + formatDateShort(new Date()).replace(/\./g, '-') + '.csv', 'text/csv;charset=utf-8');
         }
 
         function exportToODS() {
-            const table = document.getElementById('resultsTable');
+            if (!lastResults || lastResults.length === 0) {
+                alert('Brak danych do eksportu. Najpierw wykonaj mapowanie.');
+                return;
+            }
+            
             const data = [];
             
             // Nagłówki
-            const headers = [];
-            table.querySelectorAll('thead th').forEach(th => {
-                headers.push(th.textContent.trim());
-            });
-            data.push(headers);
-
-            // Dane
-            table.querySelectorAll('tbody tr').forEach(tr => {
-                const cells = [];
-                tr.querySelectorAll('td').forEach((td, idx) => {
-                    let text = td.textContent.trim();
-                    text = text.replace(/(\d+)\.(\d+)/g, '$1,$2');
-                    text = text.replace(/\n/g, ' ').replace(/\s+/g, ' ');
-                    cells.push(text);
-                });
-                data.push(cells);
+            data.push([
+                'ID Transzy',
+                'Data transzy',
+                'Kwota transzy (zł)',
+                'Suma wpłat BRUTTO (zł)',
+                'Suma prowizji (zł)',
+                'Suma zwrotów (zł)',
+                'Prow. za wypłatę (zł)',
+                'NETTO obliczone (zł)',
+                'Różnica (zł)',
+                'Status',
+                'Liczba wpłat',
+                'Typy płatności'
+            ]);
+            
+            // Dane - jako tekst z polskim formatowaniem
+            // (żeby ODS/Excel nie próbował ich interpretować)
+            lastResults.forEach(result => {
+                data.push([
+                    String(result.payout.paymentId || '-'),
+                    formatDateShort(result.payout.dateBooked),
+                    formatAmountPL(result.payout.amount),
+                    formatAmountPL(result.totalAmount),
+                    formatAmountPL(result.totalCommission),
+                    formatAmountPL(result.totalZwroty || 0),
+                    formatAmountPL(result.totalProwZaWyplate || 0),
+                    formatAmountPL(result.totalNetAmount),
+                    formatAmountPL(result.difference),
+                    Math.abs(result.difference) < 0.02 ? 'OK' : 'ROZBIEŻNOŚĆ',
+                    String(result.matchingPayments.length),
+                    [...new Set(result.matchingPayments.map(p => p.type))].join(', ')
+                ]);
             });
 
             const ws = XLSX.utils.aoa_to_sheet(data);
+            
+            // Ustawienie szerokości kolumn
+            ws['!cols'] = [
+                {wch: 12}, // ID
+                {wch: 12}, // Data
+                {wch: 18}, // Kwota transzy
+                {wch: 18}, // Brutto
+                {wch: 15}, // Prowizje
+                {wch: 15}, // Zwroty
+                {wch: 15}, // Prow za wypł
+                {wch: 18}, // Netto
+                {wch: 12}, // Różnica
+                {wch: 12}, // Status
+                {wch: 10}, // Liczba
+                {wch: 20}  // Typy
+            ];
+            
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, 'Mapowanie');
-            XLSX.writeFile(wb, 'idosell-mapowanie-' + new Date().toISOString().split('T')[0] + '.ods');
+            XLSX.writeFile(wb, 'idosell-mapowanie-' + formatDateShort(new Date()).replace(/\./g, '-') + '.ods');
+        }
+        
+        // Eksport szczegółowy - wszystkie wpłaty
+        function exportDetailedCSV() {
+            if (!lastResults || lastResults.length === 0) {
+                alert('Brak danych do eksportu. Najpierw wykonaj mapowanie.');
+                return;
+            }
+            
+            const csv = [];
+            
+            // Nagłówki
+            csv.push([
+                'ID Transzy',
+                'Data transzy',
+                'Nr zamówienia',
+                'ID płatności',
+                'Typ płatności',
+                'Data wpłaty',
+                'Kwota BRUTTO (zł)',
+                'Prowizja (zł)',
+                'Kwota NETTO (zł)'
+            ].map(h => '"' + h + '"').join(';'));
+            
+            // Dane
+            lastResults.forEach(result => {
+                result.matchingPayments.forEach(payment => {
+                    const row = [
+                        result.payout.paymentId || '-',
+                        formatDateShort(result.payout.dateBooked),
+                        payment.orderNumber || '-',
+                        payment.paymentId || '-',
+                        payment.type || '-',
+                        formatDateShort(payment.dateBooked),
+                        formatAmountPL(payment.amount),
+                        formatAmountPL(payment.commission),
+                        formatAmountPL(payment.amount - payment.commission)
+                    ];
+                    csv.push(row.map(cell => '"' + String(cell).replace(/"/g, '""') + '"').join(';'));
+                });
+            });
+            
+            const BOM = '\uFEFF';
+            downloadFile(BOM + csv.join('\n'), 'idosell-szczegoly-' + formatDateShort(new Date()).replace(/\./g, '-') + '.csv', 'text/csv;charset=utf-8');
         }
 
         function downloadFile(content, filename, mimeType) {
@@ -1463,6 +1745,74 @@
             document.body.removeChild(a);
             window.URL.revokeObjectURL(url);
         }
+        
+        // Eksport ODS z prawdziwymi liczbami (dla formuł)
+        function exportToODSNumeric() {
+            if (!lastResults || lastResults.length === 0) {
+                alert('Brak danych do eksportu. Najpierw wykonaj mapowanie.');
+                return;
+            }
+            
+            const data = [];
+            
+            // Nagłówki
+            data.push([
+                'ID Transzy',
+                'Data transzy',
+                'Kwota transzy',
+                'Suma BRUTTO',
+                'Suma prowizji',
+                'Suma zwrotów',
+                'Prow. za wypłatę',
+                'NETTO obliczone',
+                'Różnica',
+                'Status',
+                'Liczba wpłat'
+            ]);
+            
+            // Dane jako liczby (dla formuł)
+            lastResults.forEach(result => {
+                data.push([
+                    String(result.payout.paymentId || '-'),
+                    formatDateShort(result.payout.dateBooked),
+                    result.payout.amount,  // liczba
+                    result.totalAmount,    // liczba
+                    result.totalCommission, // liczba
+                    result.totalZwroty || 0, // liczba
+                    result.totalProwZaWyplate || 0, // liczba
+                    result.totalNetAmount,  // liczba
+                    result.difference,      // liczba
+                    Math.abs(result.difference) < 0.02 ? 'OK' : 'ROZBIEŻNOŚĆ',
+                    result.matchingPayments.length // liczba
+                ]);
+            });
+
+            const ws = XLSX.utils.aoa_to_sheet(data);
+            
+            // Formatowanie kolumn liczbowych (ustawienie formatu z 2 miejscami po przecinku)
+            const numericCols = [2, 3, 4, 5, 6, 7, 8]; // indeksy kolumn z kwotami
+            const range = XLSX.utils.decode_range(ws['!ref']);
+            
+            for (let R = 1; R <= range.e.r; R++) { // od wiersza 1 (pomijamy nagłówek)
+                numericCols.forEach(C => {
+                    const cellRef = XLSX.utils.encode_cell({r: R, c: C});
+                    if (ws[cellRef] && typeof ws[cellRef].v === 'number') {
+                        ws[cellRef].t = 'n'; // typ: number
+                        ws[cellRef].z = '#,##0.00'; // format liczbowy
+                    }
+                });
+            }
+            
+            // Szerokości kolumn
+            ws['!cols'] = [
+                {wch: 12}, {wch: 12}, {wch: 14}, {wch: 14}, {wch: 14},
+                {wch: 12}, {wch: 14}, {wch: 14}, {wch: 12}, {wch: 12}, {wch: 10}
+            ];
+            
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Mapowanie');
+            XLSX.writeFile(wb, 'idosell-mapowanie-numeric-' + formatDateShort(new Date()).replace(/\./g, '-') + '.ods');
+        }
 
         function printResults() {
             window.print();
@@ -1472,19 +1822,54 @@
         function formatDate(date) {
             if (!date) return '-';
             const d = new Date(date);
-            return d.toLocaleDateString('pl-PL') + ' ' + d.toLocaleTimeString('pl-PL', {hour: '2-digit', minute: '2-digit'});
+            // Sztywny polski format: DD.MM.YYYY HH:MM
+            const day = String(d.getDate()).padStart(2, '0');
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const year = d.getFullYear();
+            const hours = String(d.getHours()).padStart(2, '0');
+            const minutes = String(d.getMinutes()).padStart(2, '0');
+            return `${day}.${month}.${year} ${hours}:${minutes}`;
+        }
+        
+        // Format daty bez godziny (do eksportu)
+        function formatDateShort(date) {
+            if (!date) return '-';
+            const d = new Date(date);
+            const day = String(d.getDate()).padStart(2, '0');
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const year = d.getFullYear();
+            return `${day}.${month}.${year}`;
+        }
+        
+        // Format kwoty z przecinkiem (polski format)
+        function formatAmountPL(value) {
+            if (value === null || value === undefined || isNaN(value)) return '-';
+            return value.toFixed(2).replace('.', ',');
         }
 
         function clearAll() {
             document.getElementById('payoutFile').value = '';
             document.getElementById('blikFile').value = '';
             document.getElementById('paybyFile').value = '';
+            document.getElementById('cardsFile').value = '';
+            document.getElementById('ordersFile').value = '';
             document.getElementById('payoutFileName').textContent = '';
             document.getElementById('blikFileName').textContent = '';
             document.getElementById('paybyFileName').textContent = '';
+            document.getElementById('cardsFileName').textContent = '';
+            document.getElementById('ordersFileName').textContent = '';
             document.getElementById('alertContainer').innerHTML = '';
             document.getElementById('resultsSection').classList.remove('show');
-            parsedData = { payouts: [], blik: [], payby: [] };
+            parsedData = { 
+                payouts: [], 
+                blik: [], 
+                payby: [], 
+                cards: [],
+                prowizjeOdWplat: [],
+                zwroty: [],
+                prowizjeZaWyplate: []
+            };
+            ordersData = {};
         }
 
 
@@ -1499,7 +1884,7 @@
             if (hasDiscrepancies) {
                 icon.innerHTML = '⚠️';
                 title.innerHTML = 'Znaleziono rozbieżności!';
-                message.innerHTML = `Łączna różnica: <strong>${totalDifference.toFixed(2)} zł</strong><br><br>Sprawdź szczegóły poniżej.`;
+                message.innerHTML = `Łączna różnica: <strong>${totalDifference.toFixed(2).replace('.', ',')} zł</strong><br><br>Sprawdź szczegóły poniżej.`;
                 icon.style.color = '#ff9800';
             } else {
                 icon.innerHTML = '✅';
